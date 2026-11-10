@@ -10,8 +10,8 @@ pull-request ferries, then deliver Mona to five `main` gardens.
 
 **More games:** [GitHub Arcade](https://jdooley-clt.github.io/arcade/)
 
-**Origins:** Mona Crossing was created by [Christina Warren (@filmgirl)](https://github.com/filmgirl) — the original lives at https://github.com/filmgirl/mona-crossing.
-This copy is maintained by [@jdooley-clt](https://github.com/jdooley-clt) during her leave.
+Created by [Christina Warren (@filmgirl)](https://github.com/filmgirl), currently maintained by [Jeramiah Dooley (@jdooley-clt)](https://github.com/jdooley-clt).
+The original lives at https://github.com/filmgirl/mona-crossing.
 
 ## Controls
 
