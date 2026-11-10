@@ -6,9 +6,12 @@ An original, playable crossing game in a candy-pastel pixel neighborhood.
 Dodge bug vehicles and merge-conflict trucks, ride floating commit logs and
 pull-request ferries, then deliver Mona to five `main` gardens.
 
-**Play:** https://filmgirl.github.io/mona-crossing/
+**Play:** https://jdooley-clt.github.io/mona-crossing/
 
-**More games:** [GitHub Arcade](https://filmgirl.github.io/arcade/)
+**More games:** [GitHub Arcade](https://jdooley-clt.github.io/arcade/)
+
+**Origins:** Mona Crossing was created by [Christina Warren (@filmgirl)](https://github.com/filmgirl) — the original lives at https://github.com/filmgirl/mona-crossing.
+This copy is maintained by [@jdooley-clt](https://github.com/jdooley-clt) during her leave.
 
 ## Controls
 

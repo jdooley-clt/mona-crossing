@@ -192,7 +192,7 @@ test("standalone arcade link is focusable without starting or resuming play", as
   await open(page);
   const arcade = page.getByRole("link", { name: "GitHub Arcade", exact: true });
   await expect(arcade).toBeVisible();
-  await expect(arcade).toHaveAttribute("href", "https://filmgirl.github.io/arcade/");
+  await expect(arcade).toHaveAttribute("href", "https://jdooley-clt.github.io/arcade/");
   expect(await arcade.getAttribute("target")).toBeNull();
   await page.getByRole("link", { name: "Source & credits" }).focus();
   await page.keyboard.press("Tab");

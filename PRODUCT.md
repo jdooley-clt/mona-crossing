@@ -9,7 +9,8 @@ Visitors to the Commit Cabinet and the standalone public game want a quick,
 playable GitHub-themed crossing game, using keyboard or touch without an account.
 
 ## Operating Context
-The standalone game lives in filmgirl/mona-crossing and deploys to GitHub Pages.
+The original standalone game lives in filmgirl/mona-crossing; this copy is
+maintained in jdooley-clt/mona-crossing and deploys to GitHub Pages.
 The cabinet embeds the complete document in a sandboxed iframe; it owns no game
 audio, score, or pause bridge. Integration is maintained separately.
 
