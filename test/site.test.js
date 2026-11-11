@@ -26,7 +26,7 @@ test("standalone and repository arcade links preserve play and credits links", a
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   const readme = await readFile(new URL("../README.md", import.meta.url), "utf8");
   assert.match(html, /<a id="arcade-link" href="https:\/\/jdooley-clt\.github\.io\/arcade\/" hidden>GitHub Arcade<\/a>/);
-  assert.match(html, /<a href="https:\/\/github\.com\/jdooley-clt\/mona-crossing">Source &amp; credits<\/a>/);
+  assert.match(html, /<a id="source-link" href="https:\/\/github\.com\/jdooley-clt\/mona-crossing" hidden>Source &amp; credits<\/a>/);
   assert.match(readme, /\*\*Play:\*\* https:\/\/jdooley-clt\.github\.io\/mona-crossing\//);
   assert.match(readme, /\[GitHub Arcade\]\(https:\/\/jdooley-clt\.github\.io\/arcade\/\)/);
 });

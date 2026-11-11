@@ -167,7 +167,7 @@ test("cabinet sandbox focuses inputs; denied saves and audio are nonfatal", asyn
   await page.locator("iframe").evaluate((frame, url) => { frame.src = url; }, test.info().project.use.baseURL);
   const game = page.frameLocator("iframe");
   await expect(game.getByRole("link", { name: "GitHub Arcade", includeHidden: true })).toBeHidden();
-  await expect(game.getByRole("link", { name: "Source & credits" })).toBeVisible();
+  await expect(game.locator("#source-link")).toBeHidden();
   await game.getByRole("button", { name: "Start crossing" }).click();
   await expect(game.locator("#game")).toBeFocused();
   await page.keyboard.press("ArrowLeft");
@@ -223,7 +223,7 @@ test("arcade footer and cabinet controls fit 390 and 320 touch viewports", async
     await page.locator("iframe").evaluate((frame, url) => { frame.src = url; }, test.info().project.use.baseURL);
     const game = page.frameLocator("iframe");
     await expect(game.locator("#arcade-link")).toBeHidden();
-    await expect(game.getByRole("link", { name: "Source & credits" })).toBeVisible();
+    await expect(game.locator("#source-link")).toBeHidden();
     await game.locator("#start").tap();
     const frame = page.frames().find(frame => frame.parentFrame());
     expect(await frame.evaluate(() => ({ width: innerWidth, height: innerHeight }))).toEqual({ width, height: 850 });
@@ -239,7 +239,8 @@ test("arcade footer and cabinet controls fit 390 and 320 touch viewports", async
     await game.getByText("How to cross", { exact: true }).tap();
     await expect(game.locator(".instructions-body")).toBeVisible();
     expect(await frame.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await game.getByRole("link", { name: "Source & credits" }).scrollIntoViewIfNeeded();
+    await game.locator("footer").scrollIntoViewIfNeeded();
+    await expect(game.locator("#source-link")).toBeHidden();
     await capture(page, `arcade-cabinet-${width}-help.png`);
     await context.close();
   }
