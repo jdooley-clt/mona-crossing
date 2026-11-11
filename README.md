@@ -97,8 +97,10 @@ small focus-mode viewports can scroll to the controls.
 The game works with the cabinet's `allow-scripts allow-same-origin
 allow-pointer-lock` sandbox. It requires no popups, top navigation, fullscreen or
 parent messaging. Pause, audio and local storage belong to this game.
-The standalone footer links to GitHub Arcade in the same tab; only that link is
-hidden when embedded, avoiding a cabinet inside the cabinet.
+The standalone footer links to Source & credits and GitHub Arcade in the same
+tab. Both links are hidden when embedded: GitHub refuses to load inside a frame,
+the cabinet's Player Guide carries the Source & credits link, and this avoids a
+cabinet inside the cabinet.
 
 Artwork:
 
