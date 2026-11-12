@@ -1,8 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile, access } from "node:fs/promises";
+import { readFile, readdir, access, stat } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+import { gzipSync } from "node:zlib";
 import { createPreviewServer } from "../scripts/serve.mjs";
 import { createStorage } from "../src/storage.js";
+
+// What scripts/build.mjs stages into dist/ (plus an empty .nojekyll marker), measured with LF line endings.
+// Raise both numbers deliberately, in the same change that grows the payload; the gate trips at +10%.
+const STAGED = ["index.html", "styles.css", "src", "assets"];
+const BUDGET = { raw: 100_463, gzip: 42_903 };
+const TEXT = /\.(?:html|css|m?js|svg|txt|md)$/i;
 
 test("all entry references exist and remain relative", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
@@ -12,6 +21,8 @@ test("all entry references exist and remain relative", async () => {
   }
   assert.match(html, /aria-label="Movement controls"/);
   assert.match(html, /role="status"/);
+  assert.match(html, /<button id="timer-mode" type="button" aria-pressed="false">Relaxed timer: off<\/button>/);
+  assert.match(html, /<output id="time" aria-live="off">/);
   assert.equal((html.match(/<canvas /g) || []).length, 1);
   assert.doesNotMatch(html, /https?:\/\/[^"]+\.(?:js|css|ttf)/);
   const renderer = await readFile(new URL("../src/renderer.js", import.meta.url), "utf8");
@@ -39,32 +50,67 @@ test("the page ships a same-origin Content Security Policy and needs no inline e
     if (anchor.includes('target="_blank"')) assert.match(anchor, /rel="[^"]*\bnoopener\b[^"]*"/, anchor);
   }
 });
+async function stagedBytes() {
+  const root = fileURLToPath(new URL("../", import.meta.url));
+  const totals = { raw: 0, gzip: 0, files: 0 };
+  for (const item of STAGED) {
+    const target = path.join(root, item);
+    const files = (await stat(target)).isDirectory()
+      ? (await readdir(target, { recursive: true })).map(name => path.join(target, name))
+      : [target];
+    for (const file of files) {
+      if (!(await stat(file)).isFile()) continue;
+      let bytes = await readFile(file);
+      if (TEXT.test(file)) bytes = Buffer.from(bytes.toString("utf8").replaceAll("\r\n", "\n"));
+      totals.raw += bytes.length;
+      totals.gzip += gzipSync(bytes).length;
+      totals.files++;
+    }
+  }
+  return totals;
+}
+test("the staged payload stays within 10% of its recorded raw and gzipped budget", async () => {
+  const build = await readFile(new URL("../scripts/build.mjs", import.meta.url), "utf8");
+  assert.ok(build.includes(JSON.stringify(STAGED).replaceAll(",", ", ")), "scripts/build.mjs stages a different list; update STAGED and BUDGET together");
+  const totals = await stagedBytes();
+  assert.ok(totals.files >= 12, `only ${totals.files} staged files found`);
+  for (const kind of ["raw", "gzip"]) {
+    const limit = Math.floor(BUDGET[kind] * 1.1);
+    assert.ok(totals[kind] <= limit, `${kind} payload is ${totals[kind]} bytes; the budget allows ${limit} (baseline ${BUDGET[kind]})`);
+  }
+});
 test("storage validates saves and reports denial without interrupting play", t => {
   const warnings = [];
   t.mock.method(console, "warn", (...args) => warnings.push(args));
   const values = new Map();
   const reports = [];
   const store = createStorage({ getItem: key => values.get(key), setItem: (key, value) => values.set(key, value) }, m => reports.push(m));
-  assert.deepEqual(store.load(), { best: 0, sound: false });
-  store.save({ best: 123, sound: true });
-  assert.deepEqual(store.load(), { best: 123, sound: true });
+  assert.deepEqual(store.load(), { best: 0, sound: false, relaxed: false });
+  store.save({ best: 123, sound: true, relaxed: true });
+  assert.deepEqual(store.load(), { best: 123, sound: true, relaxed: true });
   assert.equal(reports.length, 0);
   const denied = createStorage({ getItem() { throw new Error("denied"); } }, m => reports.push(m));
-  assert.deepEqual(denied.load(), { best: 0, sound: false });
-  denied.save({ best: 1, sound: false });
+  assert.deepEqual(denied.load(), { best: 0, sound: false, relaxed: false });
+  denied.save({ best: 1, sound: false, relaxed: false });
   assert.equal(reports.length, 1);
   assert.equal(warnings.length, 1);
+});
+test("saves written before the relaxed timer existed load with the standard timer", () => {
+  const reports = [];
+  const store = createStorage({ getItem: () => '{"best":5,"sound":true}' }, m => reports.push(m));
+  assert.deepEqual(store.load(), { best: 5, sound: true, relaxed: false });
+  assert.equal(reports.length, 0);
 });
 test("malformed and invalid saved values get an actionable warning", t => {
   const warnings = [];
   t.mock.method(console, "warn", (...args) => warnings.push(args));
-  for (const raw of ["{", '{"best":-1,"sound":true}', '{"best":1,"sound":"yes"}']) {
+  for (const raw of ["{", '{"best":-1,"sound":true}', '{"best":1,"sound":"yes"}', '{"best":1,"sound":false,"relaxed":"yes"}']) {
     const reports = [];
     const store = createStorage({ getItem: () => raw }, m => reports.push(m));
-    assert.deepEqual(store.load(), { best: 0, sound: false });
+    assert.deepEqual(store.load(), { best: 0, sound: false, relaxed: false });
     assert.equal(reports.length, 1);
   }
-  assert.equal(warnings.length, 3);
+  assert.equal(warnings.length, 4);
 });
 test("preview serves project subpath, modules, fonts and rejects non-site files", async t => {
   const server = createPreviewServer();

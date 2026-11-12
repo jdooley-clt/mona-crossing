@@ -20,15 +20,21 @@ const laneSpecs = [
   { row: 9, kind: "bug", speed: 35, length: 40, gap: 128, offset: 28 }
 ];
 
-export function createGame() {
+export function createGame({ relaxed = false } = {}) {
   const game = {
-    status: "ready", score: 0, lives: 3, round: 1, time: DEADLINE,
+    status: "ready", score: 0, lives: 3, round: 1, time: DEADLINE, relaxed: relaxed === true,
     goals: GOALS.map(() => false), cooldown: 0, transition: 0,
     player: { x: WIDTH / 2, row: SPAWN_ROW }, furthest: SPAWN_ROW,
     lanes: [], events: [], elapsed: 0, remainder: 0
   };
   resetLanes(game);
   return game;
+}
+
+// The relaxed timer removes the crossing deadline (WCAG 2.2.1 Timing Adjustable). It never refills the
+// clock, so toggling it mid-crossing cannot be used to buy time or bonus in the standard mode.
+export function setRelaxed(game, relaxed) {
+  game.relaxed = relaxed === true;
 }
 
 function resetLanes(game) {
@@ -47,7 +53,7 @@ function respawn(game) {
 }
 
 export function restart(game) {
-  Object.assign(game, createGame(), { status: "playing" });
+  Object.assign(game, createGame({ relaxed: game.relaxed }), { status: "playing" });
 }
 
 export function start(game) {
@@ -137,7 +143,8 @@ export function hop(game, direction) {
       return true;
     }
     game.goals[goalIndex] = true;
-    const bonus = 100 + Math.ceil(game.time) * 5;
+    // The quick-arrival bonus needs a running clock; the relaxed timer pays the base reward only.
+    const bonus = game.relaxed ? 100 : 100 + Math.ceil(game.time) * 5;
     game.score += bonus;
     game.events.push({ type: "goal", index: goalIndex, bonus, count: game.goals.filter(Boolean).length });
     respawn(game);
@@ -173,7 +180,7 @@ function tick(game, dt) {
   }
   if (resting) return;
   if (support) game.player.x += lane.speed * dt;
-  game.time = Math.max(0, game.time - dt);
+  if (!game.relaxed) game.time = Math.max(0, game.time - dt);
   if (game.time === 0) fail(game, "deadline");
   else collide(game);
 }

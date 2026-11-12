@@ -53,12 +53,14 @@ button:focus-visible, a:focus-visible, summary:focus-visible, canvas:focus-visib
   outline-offset: 4px;
 }
 .game-shell { width: min(100% - 32px, 800px); margin: 20px auto 16px; }
-.titlebar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.titlebar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
 .title-lockup { display: flex; gap: 12px; align-items: center; min-width: 0; }
 .title-lockup img { image-rendering: pixelated; }
 h1 { margin: 0; font-size: clamp(20px, 3.8vw, 30px); font-weight: 400; line-height: 1.2; }
 .title-lockup p { margin: 5px 0 0; font-size: 11px; color: var(--plum-soft); }
-#sound { background: var(--mint); white-space: nowrap; }
+.toggles { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-left: auto; }
+.toggles button { white-space: nowrap; }
+#sound { background: var(--mint); }
 .hud {
   display: grid; grid-template-columns: repeat(5, 1fr);
   background: var(--paper); border: 2px solid var(--plum);
@@ -98,7 +100,9 @@ details { border-top: 2px solid var(--mint-edge); margin-top: 4px; }
 summary { cursor: pointer; padding: 14px 0; font-size: 12px; }
 .instructions-body { font: 15px/1.6 system-ui, sans-serif; max-width: 72ch; padding: 0 0 10px; }
 .instructions-body p { margin-top: 0; }
-footer { display: flex; justify-content: space-between; gap: 12px; font: 11px/1.5 system-ui, sans-serif; color: var(--plum-soft); margin-top: 8px; }
+footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; font: 11px/1.5 system-ui, sans-serif; color: var(--plum-soft); margin-top: 8px; }
+/* Links are flex items, not inline prose, so they carry their own 24px-tall target (WCAG 2.5.8). */
+footer a { padding-block: 4px; }
 a { color: var(--plum); text-underline-offset: 3px; }
 .notice { padding: 10px; background: var(--lavender); border: 1px solid var(--plum); font: 13px/1.5 system-ui, sans-serif; }
 @media (min-width: 900px) and (max-height: 850px) {
@@ -111,7 +115,7 @@ a { color: var(--plum); text-underline-offset: 3px; }
   .title-lockup img { width: 28px; height: 28px; }
   h1 { font-size: 18px; }
   .title-lockup p { font-size: 9px; }
-  #sound { font-size: 10px; padding: 6px 8px; }
+  .toggles button { font-size: 10px; padding: 6px 8px; }
   .titlebar { margin-bottom: 12px; gap: 5px; }
   .hud { padding: 9px 3px; gap: 1px; }
   .hud output { font-size: 13px; }

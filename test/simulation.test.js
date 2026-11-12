@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  createGame, restart, start, togglePause, advance, hop, segments,
+  createGame, restart, start, togglePause, advance, hop, segments, setRelaxed,
   platformAt, GOALS, GOAL_WIDTH, WIDTH, DEADLINE, HOP_COOLDOWN, STEP, PLAYER_HALF, CELL, drainEvents
 } from "../src/simulation.js";
 import { planRoute } from "./helpers/route.js";
@@ -174,6 +174,35 @@ test("deadline loses a heart and resets timer", () => {
   run(game, .05);
   assert.equal(game.lives, 2);
   assert.equal(game.time, DEADLINE);
+});
+test("relaxed timer removes the deadline, pays the base delivery reward and survives restart", () => {
+  const game = createGame({ relaxed: true });
+  start(game);
+  run(game, DEADLINE * 2 + 10);
+  assert.equal(game.status, "playing");
+  assert.equal(game.lives, 3);
+  assert.equal(game.time, DEADLINE);
+  deliver(game, 0);
+  assert.equal(game.score, 100);
+  assert.equal(drainEvents(game).find(e => e.type === "goal").bonus, 100);
+  restart(game);
+  assert.equal(game.relaxed, true);
+  assert.equal(createGame().relaxed, false);
+});
+test("toggling the relaxed timer mid-crossing freezes the countdown without refilling it", () => {
+  const game = playing();
+  run(game, 10);
+  const remaining = game.time;
+  assert.ok(remaining < DEADLINE);
+  setRelaxed(game, true);
+  run(game, DEADLINE);
+  assert.equal(game.time, remaining);
+  assert.equal(game.lives, 3);
+  setRelaxed(game, false);
+  run(game, 1);
+  assert.ok(game.time < remaining);
+  setRelaxed(game, "yes");
+  assert.equal(game.relaxed, false);
 });
 test("pause freezes lanes, timer, transitions and input", () => {
   const game = playing();

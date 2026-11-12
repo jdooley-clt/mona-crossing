@@ -30,13 +30,16 @@ FORM: Brief-pinned arcade playfield with an inherited cabinet identity; no rerol
         <img src="./assets/octocat.svg" alt="" width="40" height="40">
         <div><h1>Mona Crossing</h1><p>Little hops. Clean commits.</p></div>
       </div>
-      <button id="sound" type="button" aria-pressed="false">Sound: off</button>
+      <div class="toggles">
+        <button id="sound" type="button" aria-pressed="false">Sound: off</button>
+        <button id="timer-mode" type="button" aria-pressed="false">Relaxed timer: off</button>
+      </div>
     </header>
     <section class="hud" aria-label="Game status">
       <div><span class="hud-label">Score</span><output id="score">00000</output></div>
       <div><span class="hud-label">Best</span><output id="best">00000</output></div>
       <div><span class="hud-label">Hearts</span><output id="hearts" aria-label="3 hearts">3 / 3</output></div>
-      <div><span class="hud-label">Time</span><output id="time">40</output></div>
+      <div><span class="hud-label">Time</span><output id="time" aria-live="off">40</output></div>
       <div><span class="hud-label">Round</span><output id="round">01</output></div>
     </section>
     <div class="playfield">
@@ -73,16 +76,19 @@ FORM: Brief-pinned arcade playfield with an inherited cabinet identity; no rerol
       <summary>How to cross</summary>
       <div class="instructions-body">
         <p><strong>Arrows / WASD</strong> hop one tile. On touch, tap the pad.
-          <strong>P / Escape</strong> pauses; <strong>M</strong> toggles sound.
-          Click or tap the playfield to focus it inside a cabinet.</p>
+          <strong>P / Escape</strong> pauses; <strong>M</strong> toggles sound;
+          <strong>T</strong> toggles the relaxed timer. Hop and letter keys work while
+          the playfield has focus: click or tap it, or use Start, Pause or Restart.</p>
         <p>The cream sidewalks and mint median are safe. Avoid bug vehicles and
           conflict trucks. Stay on floating commit logs and PR ferries in the aqua
           river. Deliver to each empty garden marked <strong>main</strong>; a filled
           garden cannot accept another delivery.</p>
-        <p>Three hearts, 40 seconds per crossing. New ground earns points once per
-          delivery, and a quick arrival earns a bonus. Five deliveries open the next
-          round. Losing a heart resets your crossing, not your filled gardens.
-          The game pauses when you leave the tab.</p>
+        <p>Three hearts, 40 seconds per crossing. <strong>Relaxed timer</strong> removes
+          the time limit; deliveries then earn the base 100 points without the
+          quick-arrival bonus. New ground earns points once per delivery, and a quick
+          arrival earns a bonus. Five deliveries open the next round. Losing a heart
+          resets your crossing, not your filled gardens. The game pauses when you
+          leave the tab.</p>
       </div>
     </details>
     <footer>Original neighborhood &amp; sounds · Octocat © GitHub, Inc.
