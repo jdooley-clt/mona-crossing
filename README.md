@@ -21,15 +21,23 @@ The original lives at https://github.com/filmgirl/mona-crossing.
 | Start crossing / Enter | Start; resume or replay from the playfield |
 | P / Escape / Pause button | Pause or resume |
 | M / Sound button | Toggle generated sound effects |
+| T / Relaxed timer button | Toggle the relaxed timer (no crossing deadline) |
 | Restart | Instant fresh game with three hearts |
 | Touch D-pad | Hop; hold to repeat |
 
-Click or tap the playfield to focus it in an iframe. Keyboard events on menu
-buttons, links and the help disclosure keep their native behavior.
+Hops and the single-letter shortcuts (WASD, P, M, T) act only while the
+playfield has focus; Start, Pause, Restart and tapping the playfield focus it,
+also inside an iframe. Enter and Escape work from anywhere on the page outside
+a control, so typing elsewhere never moves Mona or flips a setting. Keyboard
+events on menu buttons, links and the help disclosure keep their native behavior.
 Sound defaults off and starts only after a user gesture. Leaving the tab/window
 pauses the game; resume explicitly when you return.
 
 Cream sidewalks and the mint median are safe. Every crossing has 40 seconds.
+The relaxed timer removes that deadline for players who need more time; it is
+remembered with the sound setting, and while it is on each delivery earns the
+base 100 points without the quick-arrival bonus. Switching it on or off never
+refills the clock.
 Landing in water, touching traffic, riding off the bank, missing a garden or
 entering an occupied garden costs one of three hearts. Filled gardens survive
 lost hearts. New forward ground earns ten points once per crossing, each
@@ -48,10 +56,15 @@ Node.js 22 or newer. No runtime dependencies, framework or bundler needed.
 
 ```sh
 npm start           # http://127.0.0.1:4177/mona-crossing/
-npm test            # deterministic simulation, storage, static and server tests
+npm test            # deterministic simulation, storage, static, size-budget and server tests
 npm run build       # stage only the static game in dist/
 npm run check       # tests and build together
 ```
+
+`npm test` also measures everything the build stages (about 100 KB raw and
+43 KB gzipped, with LF line endings) and fails when either total grows more than
+10% above the baseline recorded in `test/site.test.js`; raise that baseline on
+purpose in the same change that grows the payload.
 
 Browser acceptance uses Playwright as a development-only dependency:
 
@@ -79,7 +92,7 @@ The same suite is the security and accessibility gate. It asserts that the
 page's same-origin Content Security Policy raises zero `securitypolicyviolation`
 events while playing, both standalone and inside the cabinet iframe, and it runs
 axe-core (`@axe-core/playwright`) on the ready, playing, paused, help and
-game-over states in both contexts: serious and critical findings must be empty,
+game-over states in both contexts: findings of any impact must be empty,
 and an injected unlabeled button proves the scan is not vacuous.
 
 `PORT=4180 npm start` chooses another port. The preview binds to loopback.
@@ -88,11 +101,13 @@ origin root or the `/mona-crossing/` project path.
 
 ## Deployment
 
-`.github/workflows/pages.yml` runs tests for pull requests and `main`. Pushes to
-`main` and manual dispatches stage HTML, CSS, ES modules and `assets/`, then deploy
-the resulting Pages artifact. No tests, reference images, node modules or source
-checkout metadata are published. In repository Settings → Pages, select
-**GitHub Actions**. The public project URL is the Play link above.
+`.github/workflows/pages.yml` runs tests for pull requests and `main`. Direct
+pushes to `main` are blocked; changes land through pull requests that pass
+`verify`. Pushes to `main` and manual dispatches stage HTML, CSS, ES modules
+and `assets/`, then deploy the resulting Pages artifact. No tests, reference
+images, node modules or source checkout metadata are published. In repository
+Settings → Pages, select **GitHub Actions**. The public project URL is the Play
+link above.
 
 Every action is pinned to a commit SHA, the checkout keeps no credentials, and
 the artifact upload and deploy steps only run for pushes to `main` of
@@ -156,6 +171,12 @@ SIL Open Font License in `assets/fonts/OFL.txt`.
 ## Accessibility and limits
 
 Named controls, visible focus, text HUD and polite feedback are provided.
+The relaxed timer removes the only time limit (WCAG 2.2.1 Timing Adjustable),
+hop and letter shortcuts act only on the focused playfield (WCAG 2.1.4), and
+the ticking Time value stays out of live announcements while the score, hearts
+and feedback remain polite status regions. Buttons and footer links give at
+least 24×24 CSS pixel targets, and the layout has no horizontal overflow at 320
+pixels.
 Reduced motion removes river ornament and celebratory particles, never essential
 traffic movement. No default CRT, flashes or music. Local save/audio failures
 produce actionable, nonfatal notices; the game remains playable.

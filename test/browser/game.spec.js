@@ -77,7 +77,7 @@ async function eachState(page, game, frame, check) {
   await expect(game.getByRole("button", { name: "Play again" })).toBeVisible();
   await check("over");
 }
-// Serious and critical axe-core findings only; `embedded` scopes the run to the cabinet iframe's document.
+// Every axe-core finding, whatever its impact; `embedded` scopes the run to the cabinet iframe's document.
 // axe resolves every rule through setTimeout(0), so the fake clock has to flow while it scans.
 async function accessibilityViolations(page, embedded = false) {
   const builder = new AxeBuilder({ page });
@@ -85,8 +85,7 @@ async function accessibilityViolations(page, embedded = false) {
   await page.clock.resume();
   try {
     const { violations } = await builder.analyze();
-    return violations.filter(({ impact }) => impact === "serious" || impact === "critical")
-      .map(({ id, impact, nodes }) => ({ id, impact, targets: nodes.map(node => node.target.join(" ")) }));
+    return violations.map(({ id, impact, nodes }) => ({ id, impact, targets: nodes.map(node => node.target.join(" ")) }));
   } finally {
     await page.clock.pauseAt(await page.evaluate(() => Date.now()) + 1000);
   }
@@ -213,7 +212,7 @@ test("phone touch play at 390 and 320; landscape, help and menu keys stay usable
   for (const size of [{ width: 320, height: 720 }, { width: 844, height: 390 }]) {
     await page.setViewportSize(size);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    for (const name of ["Sound: off", "Restart", "Hop up", "Hop down"]) {
+    for (const name of ["Sound: off", "Relaxed timer: off", "Restart", "Hop up", "Hop down"]) {
       await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
     }
     await expect(page.locator("#pause")).toBeVisible();
@@ -263,15 +262,76 @@ test("standalone arcade link is focusable without starting or resuming play", as
   await page.keyboard.press("Tab");
   await expect(arcade).toBeFocused();
   const ready = await snapshot(page);
-  for (const key of ["ArrowUp", "w", "p", "m", " "]) await page.keyboard.press(key);
+  for (const key of ["ArrowUp", "w", "p", "m", "t", " "]) await page.keyboard.press(key);
   expect(await snapshot(page)).toEqual(ready);
   await expect(page.locator("#sound")).toHaveText("Sound: off");
+  await expect(page.locator("#timer-mode")).toHaveText("Relaxed timer: off");
   await capture(page, "arcade-desktop-focus.png");
   await page.locator("#start").click();
   await page.locator("#pause").click();
   await arcade.focus();
   await page.keyboard.press("p");
   expect((await snapshot(page)).status).toBe("paused");
+});
+
+test("relaxed timer lifts the deadline and persists; letter keys only act on the focused playfield", async ({ page }) => {
+  await open(page);
+  const toggle = page.locator("#timer-mode");
+  const time = page.locator("#time");
+  await expect(toggle).toHaveText("Relaxed timer: off");
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await expect(time).toHaveText("40");
+  // With focus on the page body, typing letters must not flip settings or move Mona; Enter still starts.
+  expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);
+  await page.keyboard.press("t");
+  await page.keyboard.press("m");
+  await expect(toggle).toHaveText("Relaxed timer: off");
+  await expect(page.locator("#sound")).toHaveText("Sound: off");
+  expect((await snapshot(page)).status).toBe("ready");
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#game")).toBeFocused();
+  await page.keyboard.press("t");
+  await expect(toggle).toHaveText("Relaxed timer: on");
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await expect(time).toHaveText("∞");
+  await expect(time).toHaveAttribute("aria-label", "No time limit");
+  await expect(page.locator("#feedback")).toContainText("Relaxed timer on");
+  await page.clock.runFor(45000);
+  expect(await snapshot(page)).toMatchObject({ status: "playing", lives: 3, time: 40, relaxed: true });
+  await page.evaluate(() => document.activeElement.blur());
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("p");
+  await page.clock.runFor(160);
+  expect(await snapshot(page)).toMatchObject({ status: "playing", player: { row: 10 } });
+  await page.keyboard.press("Escape");
+  expect((await snapshot(page)).status).toBe("paused");
+  await page.locator("#start").click();
+  await page.keyboard.press("t");
+  await expect(toggle).toHaveText("Relaxed timer: off");
+  await expect(time).toHaveText("40");
+  expect(await time.getAttribute("aria-label")).toBeNull();
+  await page.clock.runFor(2000);
+  expect((await snapshot(page)).time).toBeLessThan(40);
+  await toggle.click();
+  await expect(toggle).toHaveText("Relaxed timer: on");
+  await page.keyboard.press("t");
+  await expect(toggle).toHaveText("Relaxed timer: on");
+  expect(JSON.parse(await page.evaluate(() => localStorage.getItem("mona-crossing:v1")))).toMatchObject({ relaxed: true });
+  await page.reload();
+  await expect(toggle).toHaveText("Relaxed timer: on");
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await expect(time).toHaveText("∞");
+  expect((await snapshot(page)).relaxed).toBe(true);
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "localStorage", { get() { throw new Error("Test denied storage"); } });
+  });
+  await page.reload();
+  await expect(page.locator("#notice")).toContainText("storage");
+  await expect(toggle).toHaveText("Relaxed timer: off");
+  await toggle.click();
+  await expect(toggle).toHaveText("Relaxed timer: on");
+  await expect(time).toHaveText("∞");
+  expect((await snapshot(page)).relaxed).toBe(true);
 });
 
 test("arcade footer and cabinet controls fit 390 and 320 touch viewports", async ({ browser }) => {
@@ -342,7 +402,7 @@ test("the Content Security Policy is enforced with zero violations standalone an
   expect(reports).toEqual([]);
 });
 
-test("axe-core finds no serious or critical issue in any game state, standalone or inside the cabinet", async ({ page }) => {
+test("axe-core finds no issue of any impact in any game state, standalone or inside the cabinet", async ({ page }) => {
   test.setTimeout(240000);
   const canary = '<button id="axe-canary" type="button"></button>';
   await open(page);

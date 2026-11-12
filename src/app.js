@@ -1,4 +1,4 @@
-import { createGame, start, restart, hop, advance, togglePause, pause, drainEvents, DEADLINE } from "./simulation.js";
+import { createGame, start, restart, hop, advance, togglePause, pause, setRelaxed, drainEvents, DEADLINE } from "./simulation.js";
 import { createRenderer } from "./renderer.js";
 import { createStorage } from "./storage.js";
 import { createAudio } from "./audio.js";
@@ -18,12 +18,12 @@ let storage;
 try { storage = window.localStorage; }
 catch (error) {
   console.warn("Mona Crossing storage access denied:", error);
-  report("Site storage is blocked. Best score and sound preference last only this visit.");
+  report("Site storage is blocked. Best score and settings last only this visit.");
 }
 const saves = createStorage(storage, report);
 const settings = saves.load();
 const audio = createAudio(report);
-const game = createGame();
+const game = createGame({ relaxed: settings.relaxed });
 export function getGameSnapshot() {
   return structuredClone(game);
 }
@@ -52,10 +52,24 @@ const reasons = {
   garden: "Find a main garden, not the hedge!"
 };
 
-function save() { saves.save({ best: settings.best, sound: settings.sound }); }
+function save() { saves.save({ best: settings.best, sound: settings.sound, relaxed: settings.relaxed }); }
 function updateSound() {
   $("sound").textContent = `Sound: ${settings.sound ? "on" : "off"}`;
   $("sound").setAttribute("aria-pressed", String(settings.sound));
+}
+function updateTimerMode() {
+  $("timer-mode").textContent = `Relaxed timer: ${settings.relaxed ? "on" : "off"}`;
+  $("timer-mode").setAttribute("aria-pressed", String(settings.relaxed));
+}
+function toggleTimerMode() {
+  settings.relaxed = !settings.relaxed;
+  setRelaxed(game, settings.relaxed);
+  updateTimerMode();
+  save();
+  feedback = settings.relaxed
+    ? "Relaxed timer on. Take all the time you need; deliveries earn 100 each."
+    : `Standard timer on. ${DEADLINE} seconds per crossing with a quick-arrival bonus.`;
+  sync();
 }
 async function unlockSound() {
   const request = ++soundRequest;
@@ -106,17 +120,23 @@ function sync() {
     if (event.type === "over") feedback = `${feedback} Final score: ${game.score}.`;
   }
   if (game.score > settings.best) { settings.best = game.score; save(); }
-  const hud = [game.score, settings.best, game.lives, Math.ceil(game.time), game.round].join();
+  const hud = [game.score, settings.best, game.lives, Math.ceil(game.time), game.round, game.relaxed].join();
   if (hud !== lastHud) {
     $("score").textContent = String(game.score).padStart(5, "0");
     $("best").textContent = String(settings.best).padStart(5, "0");
     $("hearts").textContent = `${game.lives} / 3`;
     $("hearts").setAttribute("aria-label", `${game.lives} hearts`);
-    $("time").textContent = String(Math.ceil(game.time)).padStart(2, "0");
+    if (game.relaxed) {
+      $("time").textContent = "∞";
+      $("time").setAttribute("aria-label", "No time limit");
+    } else {
+      $("time").textContent = String(Math.ceil(game.time)).padStart(2, "0");
+      $("time").removeAttribute("aria-label");
+    }
     $("round").textContent = String(game.round).padStart(2, "0");
     lastHud = hud;
   }
-  $("time-bar").style.width = `${game.time / DEADLINE * 100}%`;
+  $("time-bar").style.width = game.relaxed ? "100%" : `${game.time / DEADLINE * 100}%`;
   if ($("feedback").textContent !== feedback) $("feedback").textContent = feedback;
   if (lastStatus !== game.status) {
     $("overlay").hidden = game.status === "playing";
@@ -147,6 +167,7 @@ $("sound").addEventListener("click", () => {
   save();
   unlockSound();
 });
+$("timer-mode").addEventListener("click", toggleTimerMode);
 canvas.addEventListener("pointerdown", () => { focusGame(); unlockSound(); });
 
 const directions = {
@@ -158,15 +179,20 @@ window.addEventListener("keydown", event => {
   const target = event.target;
   if (target instanceof Element && target.closest("button, a, summary, input, textarea, select, [contenteditable]")) return;
   const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+  if (key === "Enter") { if (!event.repeat && game.status !== "playing") activate(); return; }
+  if (key === "Escape") { event.preventDefault(); if (!event.repeat) pauseGame(); return; }
+  // Hops and single-letter shortcuts only act while the playfield has focus, so typing elsewhere on the
+  // page never moves Mona or flips a setting (WCAG 2.1.4 Character Key Shortcuts).
+  if (document.activeElement !== canvas) return;
   const direction = directions[key];
   if (direction) {
     event.preventDefault();
     if (!event.repeat) { held = { direction, source: key }; heldTime = .2; move(direction); }
     return;
   }
-  if (key === "p" || key === "Escape") { event.preventDefault(); if (!event.repeat) pauseGame(); }
+  if (key === "p") { event.preventDefault(); if (!event.repeat) pauseGame(); }
   if (key === "m" && !event.repeat) $("sound").click();
-  if (key === "Enter" && !event.repeat && game.status !== "playing") activate();
+  if (key === "t" && !event.repeat) $("timer-mode").click();
 });
 window.addEventListener("keyup", event => {
   const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
@@ -211,5 +237,6 @@ function frame(timestamp) {
   requestAnimationFrame(frame);
 }
 updateSound();
+updateTimerMode();
 sync();
 if (renderer) requestAnimationFrame(frame);
