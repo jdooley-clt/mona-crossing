@@ -30,6 +30,15 @@ test("standalone and repository arcade links preserve play and credits links", a
   assert.match(readme, /\*\*Play:\*\* https:\/\/jdooley-clt\.github\.io\/mona-crossing\//);
   assert.match(readme, /\[GitHub Arcade\]\(https:\/\/jdooley-clt\.github\.io\/arcade\/\)/);
 });
+test("the page ships a same-origin Content Security Policy and needs no inline exceptions", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  assert.match(html, /<meta name="referrer" content="strict-origin-when-cross-origin">/);
+  assert.match(html, /<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">/);
+  assert.doesNotMatch(html, /<script(?![^>]*\bsrc=)|<style[\s>]|\sstyle="|\son[a-z]+="/);
+  for (const [anchor] of html.matchAll(/<a\s[^>]*>/g)) {
+    if (anchor.includes('target="_blank"')) assert.match(anchor, /rel="[^"]*\bnoopener\b[^"]*"/, anchor);
+  }
+});
 test("storage validates saves and reports denial without interrupting play", t => {
   const warnings = [];
   t.mock.method(console, "warn", (...args) => warnings.push(args));

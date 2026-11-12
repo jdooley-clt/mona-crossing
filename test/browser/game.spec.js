@@ -1,7 +1,9 @@
 import { test, expect } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 import { planRoute as plan } from "../helpers/route.js";
 import path from "node:path";
 
+const CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'";
 const snapshot = page => page.evaluate(async () => {
   const { getGameSnapshot } = await import("./src/app.js");
   return getGameSnapshot();
@@ -21,6 +23,72 @@ async function step(page, direction, ms = 160) {
 async function capture(page, name) {
   if (process.env.CAPTURE_DIR) {
     await page.screenshot({ path: path.join(process.env.CAPTURE_DIR, name), fullPage: true });
+  }
+}
+// Collects CSP violation events from every frame of the page, plus Chrome's console reports of them.
+async function watchCsp(page) {
+  const reports = [];
+  page.on("console", message => { if (message.text().includes("Content Security Policy")) reports.push(message.text()); });
+  await page.addInitScript(() => {
+    window.__cspViolations = [];
+    document.addEventListener("securitypolicyviolation", event => window.__cspViolations.push(
+      `${event.violatedDirective} blocked ${event.blockedURI || "inline"} at ${event.sourceFile}:${event.lineNumber}`));
+  });
+  return reports;
+}
+const cspViolations = frame => frame.evaluate(() => window.__cspViolations);
+// The cabinet iframe paints its Start button before src/app.js has evaluated, so a click can land before the
+// controller is listening. Resolves the game frame once the module graph is loaded and reports ready.
+async function booted(page) {
+  await expect(page.frameLocator("iframe").locator("#start")).toBeVisible();
+  const frame = page.frames().find(frame => frame.parentFrame());
+  expect((await snapshot(frame)).status).toBe("ready");
+  return frame;
+}
+// The harness document has no policy of its own; only the game inside the iframe runs under index.html's CSP.
+async function embed(page) {
+  await page.goto("./styles.css");
+  await page.setContent('<iframe title="Mona Crossing" style="width:800px;height:1100px" sandbox="allow-scripts allow-same-origin allow-pointer-lock" allow="fullscreen; gamepad"></iframe>');
+  await page.locator("iframe").evaluate((frame, url) => { frame.src = url; }, test.info().project.use.baseURL);
+  const frame = await booted(page);
+  await frame.evaluate(() => document.fonts.ready);
+  return { game: page.frameLocator("iframe"), frame };
+}
+// Drives the real controls through every UI state and runs `check(state)` in each one.
+async function eachState(page, game, frame, check) {
+  await expect(game.getByRole("button", { name: "Start crossing" })).toBeVisible();
+  await check("ready");
+  await game.locator("#start").click();
+  await page.clock.runFor(500);
+  await expect(game.locator("#overlay")).toBeHidden();
+  await check("playing");
+  await game.locator("#pause").click();
+  await expect(game.getByRole("button", { name: "Resume crossing" })).toBeVisible();
+  await check("paused");
+  await game.getByText("How to cross", { exact: true }).click();
+  await expect(game.locator(".instructions-body")).toBeVisible();
+  await check("instructions");
+  await game.locator("#start").click();
+  await page.clock.runFor(32);
+  // Blind upward hops lose the three hearts; the 40-second deadline alone ends the game within the bound.
+  await page.keyboard.down("ArrowUp");
+  for (let i = 0; i < 40 && (await snapshot(frame)).status !== "over"; i++) await page.clock.runFor(4000);
+  await page.keyboard.up("ArrowUp");
+  await expect(game.getByRole("button", { name: "Play again" })).toBeVisible();
+  await check("over");
+}
+// Serious and critical axe-core findings only; `embedded` scopes the run to the cabinet iframe's document.
+// axe resolves every rule through setTimeout(0), so the fake clock has to flow while it scans.
+async function accessibilityViolations(page, embedded = false) {
+  const builder = new AxeBuilder({ page });
+  if (embedded) builder.include(["iframe", "html"]);
+  await page.clock.resume();
+  try {
+    const { violations } = await builder.analyze();
+    return violations.filter(({ impact }) => impact === "serious" || impact === "critical")
+      .map(({ id, impact, nodes }) => ({ id, impact, targets: nodes.map(node => node.target.join(" ")) }));
+  } finally {
+    await page.clock.pauseAt(await page.evaluate(() => Date.now()) + 1000);
   }
 }
 
@@ -162,10 +230,7 @@ test("phone touch play at 390 and 320; landscape, help and menu keys stay usable
 });
 
 test("cabinet sandbox focuses inputs; denied saves and audio are nonfatal", async ({ page }) => {
-  await page.goto("./styles.css");
-  await page.setContent('<iframe title="Mona Crossing" style="width:800px;height:1100px" sandbox="allow-scripts allow-same-origin allow-pointer-lock" allow="fullscreen; gamepad"></iframe>');
-  await page.locator("iframe").evaluate((frame, url) => { frame.src = url; }, test.info().project.use.baseURL);
-  const game = page.frameLocator("iframe");
+  const { game } = await embed(page);
   await expect(game.getByRole("link", { name: "GitHub Arcade", includeHidden: true })).toBeHidden();
   await expect(game.locator("#source-link")).toBeHidden();
   await game.getByRole("button", { name: "Start crossing" }).click();
@@ -222,10 +287,10 @@ test("arcade footer and cabinet controls fit 390 and 320 touch viewports", async
     await page.setContent('<meta name="viewport" content="width=device-width, initial-scale=1"><style>body{margin:0}iframe{display:block;width:100%;height:850px;border:0}</style><iframe title="Mona Crossing" sandbox="allow-scripts allow-same-origin allow-pointer-lock" allow="fullscreen; gamepad"></iframe>');
     await page.locator("iframe").evaluate((frame, url) => { frame.src = url; }, test.info().project.use.baseURL);
     const game = page.frameLocator("iframe");
+    const frame = await booted(page);
     await expect(game.locator("#arcade-link")).toBeHidden();
     await expect(game.locator("#source-link")).toBeHidden();
     await game.locator("#start").tap();
-    const frame = page.frames().find(frame => frame.parentFrame());
     expect(await frame.evaluate(() => ({ width: innerWidth, height: innerHeight }))).toEqual({ width, height: 850 });
     const before = await snapshot(frame);
     await game.getByRole("button", { name: "Hop left" }).tap();
@@ -244,4 +309,56 @@ test("arcade footer and cabinet controls fit 390 and 320 touch viewports", async
     await capture(page, `arcade-cabinet-${width}-help.png`);
     await context.close();
   }
+});
+
+test("the Content Security Policy is enforced with zero violations standalone and inside the cabinet", async ({ page }) => {
+  const reports = await watchCsp(page);
+  await open(page);
+  expect(await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute("content")).toBe(CSP);
+  expect(await page.locator('meta[name="referrer"]').getAttribute("content")).toBe("strict-origin-when-cross-origin");
+  await page.locator("#sound").click();
+  await expect(page.locator("#sound")).toHaveText("Sound: on");
+  await page.locator("#start").click();
+  await page.clock.runFor(32);
+  await page.keyboard.press("ArrowUp");
+  await page.clock.runFor(160);
+  await page.locator("#pause").click();
+  await page.getByText("How to cross", { exact: true }).click();
+  await expect(page.locator(".instructions-body")).toBeVisible();
+  await page.getByRole("button", { name: "Restart", exact: true }).click();
+  await page.clock.runFor(1000);
+  expect((await snapshot(page)).status).toBe("playing");
+  await page.locator("#sound").click();
+  expect(await cspViolations(page)).toEqual([]);
+
+  const { game, frame } = await embed(page);
+  await game.locator("#start").click();
+  await page.clock.runFor(32);
+  await page.keyboard.press("ArrowUp");
+  await page.clock.runFor(160);
+  await game.locator("#pause").click();
+  expect((await snapshot(frame)).status).toBe("paused");
+  expect(await cspViolations(frame)).toEqual([]);
+  expect(reports).toEqual([]);
+});
+
+test("axe-core finds no serious or critical issue in any game state, standalone or inside the cabinet", async ({ page }) => {
+  test.setTimeout(240000);
+  const canary = '<button id="axe-canary" type="button"></button>';
+  await open(page);
+  await eachState(page, page, page, async state => {
+    expect(await accessibilityViolations(page), `standalone ${state}`).toEqual([]);
+  });
+  // An unlabeled control must trip the gate, proving the scan is not vacuous.
+  await page.evaluate(html => document.body.insertAdjacentHTML("beforeend", html), canary);
+  expect(await accessibilityViolations(page)).toEqual([{ id: "button-name", impact: "critical", targets: ["#axe-canary"] }]);
+
+  const { game, frame } = await embed(page);
+  await eachState(page, game, frame, async state => {
+    expect(await accessibilityViolations(page, true), `cabinet ${state}`).toEqual([]);
+  });
+  await frame.evaluate(html => document.body.insertAdjacentHTML("beforeend", html), canary);
+  expect(await accessibilityViolations(page, true)).toEqual([
+    { id: "button-name", impact: "critical", targets: [expect.stringMatching(/^iframe.* #axe-canary$/)] }
+  ]);
 });

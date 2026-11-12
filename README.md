@@ -75,6 +75,13 @@ on the road. It observes current geometry
 without searching future routes or modifying game state; it is automated
 human-paced coverage, not a substitute for a user's playtest.
 
+The same suite is the security and accessibility gate. It asserts that the
+page's same-origin Content Security Policy raises zero `securitypolicyviolation`
+events while playing, both standalone and inside the cabinet iframe, and it runs
+axe-core (`@axe-core/playwright`) on the ready, playing, paused, help and
+game-over states in both contexts: serious and critical findings must be empty,
+and an injected unlabeled button proves the scan is not vacuous.
+
 `PORT=4180 npm start` chooses another port. The preview binds to loopback.
 Use an HTTP server, not `file://`, for ES modules. Relative assets work at the
 origin root or the `/mona-crossing/` project path.
@@ -86,6 +93,15 @@ origin root or the `/mona-crossing/` project path.
 the resulting Pages artifact. No tests, reference images, node modules or source
 checkout metadata are published. In repository Settings → Pages, select
 **GitHub Actions**. The public project URL is the Play link above.
+
+Every action is pinned to a commit SHA, the checkout keeps no credentials, and
+the artifact upload and deploy steps only run for pushes to `main` of
+`jdooley-clt/mona-crossing`, so forks and pull requests never publish. Dependabot
+(`.github/dependabot.yml`) proposes weekly updates for the pinned actions and for
+npm development dependencies. Browser failures upload their Playwright traces as
+a `test-results` artifact; if the main run flakes, `gh run rerun <run-id> --failed`
+re-runs only the failed job, and the deploy only happens after the gate is green.
+Security reports go through `SECURITY.md`.
 
 ## Cabinet integration
 
