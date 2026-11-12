@@ -50,6 +50,27 @@ test("the page ships a same-origin Content Security Policy and needs no inline e
     if (anchor.includes('target="_blank"')) assert.match(anchor, /rel="[^"]*\bnoopener\b[^"]*"/, anchor);
   }
 });
+test("LICENSE is the bare MIT text GitHub detects and NOTICE carries the artwork and font terms", async () => {
+  const license = await readFile(new URL("../LICENSE", import.meta.url), "utf8");
+  const notice = await readFile(new URL("../NOTICE", import.meta.url), "utf8");
+  for (const [name, text] of [["LICENSE", license], ["NOTICE", notice]]) {
+    assert.doesNotMatch(text, /\r/, `${name} must use LF line endings (.gitattributes sets eol=lf)`);
+    assert.ok(text.endsWith("\n") && !text.endsWith("\n\n"), `${name} must end with exactly one newline`);
+  }
+  assert.match(license, /^MIT License\n\nCopyright \(c\) 2026 Mona Crossing contributors\n\n/);
+  assert.ok(license.endsWith("OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"),
+    "LICENSE must end right after the MIT text; anything appended stops GitHub from detecting MIT");
+  assert.doesNotMatch(license, /Octocat|Silkscreen|OFL/, "artwork and font terms belong in NOTICE, not LICENSE");
+  assert.match(notice, /^Mona Crossing is licensed under the MIT License; see LICENSE\.\n\n/);
+  assert.match(notice, /It does not grant rights to GitHub's Octocat design or trademarks\./);
+  assert.match(notice, /remains copyright GitHub, Inc\. and subject to GitHub artwork\nterms: https:\/\/octodex\.github\.com\/faq\//);
+  assert.match(notice, /\nSilkscreen is separately licensed under assets\/fonts\/OFL\.txt\.\n$/);
+  for (const file of notice.match(/\b(?:assets|src)\/[\w./-]+\.\w+/g) ?? []) {
+    await assert.doesNotReject(access(new URL(`../${file}`, import.meta.url)), `NOTICE names a missing file: ${file}`);
+  }
+  const readme = await readFile(new URL("../README.md", import.meta.url), "utf8");
+  assert.match(readme, /covered by `LICENSE` \(see\s+`NOTICE` for artwork and font terms\)/);
+});
 async function stagedBytes() {
   const root = fileURLToPath(new URL("../", import.meta.url));
   const totals = { raw: 0, gzip: 0, files: 0 };

@@ -19,11 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-This license covers original game code and original neighborhood illustrations.
-It does not grant rights to GitHub's Octocat design or trademarks. The adapted
-pixel Octocat in assets/octocat.svg, assets/mona-crossing-cover.svg, and
-src/renderer.js remains copyright GitHub, Inc. and subject to GitHub artwork
-terms: https://octodex.github.com/faq/
-
-Silkscreen is separately licensed under assets/fonts/OFL.txt.

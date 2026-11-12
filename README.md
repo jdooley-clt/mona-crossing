@@ -152,7 +152,8 @@ periodically, while Mona herself must hop before reaching an offscreen edge.
 ## Credits and rights
 
 Original game, neighborhood, pixel buildings, bug vehicles, log/ferry art, cover
-composition and generated square-wave effects are covered by `LICENSE`.
+composition and generated square-wave effects are covered by `LICENSE` (see
+`NOTICE` for artwork and font terms).
 No reference screenshots, maps, character sprites or music were copied.
 No external runtime requests, analytics, accounts, backend or leaderboard.
 
